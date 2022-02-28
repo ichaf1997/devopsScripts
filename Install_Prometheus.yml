@@ -1,0 +1,56 @@
+- name: Install Prometheus TSDB
+  hosts:
+  - prom
+  environment:
+    http_proxy: http://192.168.246.206:9090
+    https_proxy: http://192.168.246.206:9090
+  vars:
+    prometheus_version: 2.33.4
+    install_directory: /data/PRG/prometheus
+  tasks:
+  - name: 'Check stat of {{ install_directory }}'
+    ansible.builtin.stat:
+      path: '{{ install_directory }}'
+    register: file_details
+  - name: 'Process Break because of {{ install_directory }} exist'
+    ansible.builtin.fail:
+      msg: '{{ install_directory }} existed ,nothing to do'
+    when: file_details.stat.exists
+  - name: 'Create User: monitor'
+    ansible.builtin.user:
+      name: monitor
+      system: yes
+      create_home: no
+      shell: /sbin/nologin
+  - name: 'Create directory {{ install_directory }}'
+    ansible.builtin.file:
+      name: '{{ install_directory }}'
+      state: directory
+      owner: monitor
+      group: monitor
+  - name: 'Download Prometheus Version: {{ prometheus_version }}'
+    ansible.builtin.get_url:
+      url: 'https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz'
+      dest: '/tmp/prometheus.tgz'
+  - name: 'unarchive Prometheus pkgs'
+    ansible.builtin.unarchive:
+      src: /tmp/prometheus.tgz
+      remote_src: yes
+      dest: '{{ install_directory }}'
+      owner: monitor
+      group: monitor
+      extra_opts:
+        - --strip-components=1
+  - name: 'Create systemd service: prometheus'
+    ansible.builtin.shell: |
+      echo '[Unit]
+      Description=Prometheus
+      Documentation=https://prometheus.io/
+      After=network.target
+      [Service]
+      Type=simple
+      ExecStart={{ install_directory }} --config.file={{ install_directory }}/prometheus.yml --storage.tsdb.path={{ install_directory }}/data --log.format=json --web.enable-lifecycle --web.listen-address=0.0.0.0:9090
+      Restart=on-failure
+      [Install]
+      WantedBy=multi-user.target' > /usr/lib/systemd/system/prometheus.service    
+    when: ansible_distribution_major_version == "7"
