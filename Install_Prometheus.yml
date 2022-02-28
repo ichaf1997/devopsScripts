@@ -6,6 +6,7 @@
     https_proxy: http://192.168.246.206:9090
   vars:
     prometheus_version: 2.33.4
+    bind_port: 9090
     install_directory: /data/PRG/prometheus
   tasks:
   - name: 'Check stat of {{ install_directory }}'
@@ -49,7 +50,7 @@
       After=network.target
       [Service]
       Type=simple
-      ExecStart={{ install_directory }} --config.file={{ install_directory }}/prometheus.yml --storage.tsdb.path={{ install_directory }}/data --log.format=json --web.enable-lifecycle --web.listen-address=0.0.0.0:9090
+      ExecStart={{ install_directory }} --config.file={{ install_directory }}/prometheus.yml --storage.tsdb.path={{ install_directory }}/data --log.format=json --web.enable-lifecycle --web.listen-address=0.0.0.0:{{ bind_port }}
       Restart=on-failure
       [Install]
       WantedBy=multi-user.target' > /usr/lib/systemd/system/prometheus.service    
